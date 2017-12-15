@@ -1,5 +1,5 @@
-
-##Project description:
+ 
+## Project description:
 
 In this project, the goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to predict the manner in which they did the exercise. This is the "classe" variable in the training set.
 
@@ -10,7 +10,7 @@ https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
 
 The data for this project come from this source: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har. 
 
-##1.Data preprocessing.
+## 1.Data preprocessing.
 
 Before going to the data analysis I performed a data cleaning, which included the following steps in the training set:
 * Removing variables from columns 1 to 6 , containing observation number, user name, and different time denotations. These variables were removed, because they are either non numerical or describe the same variable (time) on different scales.
@@ -22,11 +22,11 @@ The resulting data set consisted of 19622 samples and 25 variables.
 
 The same variables were removed from the testing set. The resulting testing set consisted of 20 samples and 25 variables.
 
-##2. Validation set
+## 2. Validation set
 
 The following step was to create a validation set. Since the original training set contains a large number of samples (19622) the validation set might be chosen as a subset of the original training set. This was done randomly by using createDataPartition function from the caret package with a p=0.8 (i.e. 80% of the original training set was used for training and 20% was used for validation set). The resulting training set consisted of 15699 samples and the validation set consisted of 3923 samples.
 
-##3. Model fitting
+## 3. Model fitting
 
 To find the best predicting model the following methods were used (argument method in the train function from the caret package)
 1. cart classification trees ("rpart")
@@ -44,7 +44,7 @@ For all the five approaches the prediction was performed on the validation set, 
 
 Based on these results one may expect that boosted trees and random forests will perform best and approximatly the same on the testing set.
 
-##4. Prediction on a test set
+## 4. Prediction on a test set
 The final predictionon the test set was made based on the random forest model. For the 20 individuals the following prediction was made based on this method: 
  [1] B A B A A E D B A A B C B A E E A B B B
 
