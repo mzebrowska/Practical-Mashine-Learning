@@ -1,0 +1,193 @@
+---
+title: "project-pml"
+author: "Magdalena Zebrowska"
+date: "27 December 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Project description:
+
+In this project, the goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to predict the manner in which they did the exercise. This is the "classe" variable in the training set.
+
+The training data for this project are available here:
+<https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv>
+The test data are available here:
+<https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv>
+
+The data for this project come from this source: <http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har>
+
+```{r}
+training = read.csv("C:\\Users\\mpzeb\\Desktop\\Magda\\COURSERA\\8-PRACTICAL-MACHINE-LEARNING\\4-WEEK\\pml-training.csv")
+
+testing = read.csv("C:\\Users\\mpzeb\\Desktop\\Magda\\COURSERA\\8-PRACTICAL-MACHINE-LEARNING\\4-WEEK\\pml-testing.csv")
+```
+## 1.Data preprocessing.
+
+Before going to the data analysis I performed a data cleaning, which included the following steps in the training set:
+
+* Removing variables from columns 1 to 6 , containing observation number, user name, and different time denotations. These variables were removed, because they are either non numerical or describe the same variable (time) on different scales.
+
+* Removing variables for which the percentage of "NA" observations were higher than 97%
+```{r}
+isna<-apply(training,2,is.na)
+isna.indices<-apply(isna,2,which)
+Llist<-lapply(isna.indices,length)
+length.vec<-unlist(Llist, recursive = TRUE, use.names = TRUE)#unlisted
+unique(length.vec)# either none or 19216 obs are NA
+na.vars<-which(length.vec>=(0.97*dim(training)[1]))## for these variables more than 97% of obs are NA
+training.small<-training[,-na.vars]
+```
+* Removing variables containing summary statistics after each time slot, i.e. variables which names contained "kurtosis","skewness","max_","min_" or "amplitude".
+
+```{r}
+to.remove<-c(grep("kurtosis", names(training.small)),grep("skewness", names(training.small)),grep("max_yaw", names(training.small)),grep("min_yaw", names(training.small)),
+  grep("amplitude_yaw", names(training.small)))
+
+training.sm<-training.small[,-to.remove] # reduced data set
+training.small<-training[,-na.vars]
+```
+
+* Removing colinear variables based on the correlation matrix, i.e. variables for which the correlation coefficient was larger than 0.8 were considered to be colinear. These variables were removed from the data set.
+
+```{r}
+library(corrplot)
+predictors<-training.sm[,-c(1:6,60)]
+corr.matrix <- cor(predictors)
+diag(corr.matrix)<-0
+high.corr<-function(vector){return(which(vector>=0.7))}
+coll.list<-apply(corr.matrix,1,high.corr)
+Llist<-lapply(coll.list,length)## which args are non0
+Ind<-which(Llist>0)
+predictors<-predictors[,-Ind]
+training.SM<-cbind(predictors,training.sm[,60])
+dim(training.SM)[2]
+names(training.SM)[dim(training.SM)[2]]<-names(training.sm)[60]
+training.sm<-training.SM
+dim(training.sm)
+```
+
+The resulting data set consisted of 19622 samples and 25 variables.
+
+The same variables were removed from the testing set. 
+
+
+```{r}
+## TESTING SET
+testing.small<-testing[,-na.vars]
+testing.sm<-testing.small[,-to.remove] # reduced data set
+testing.sm<-testing.sm[,-c(1:6,(Ind+6))]
+dim(testing.sm)
+```
+
+The resulting testing set consisted of 20 samples and 25 variables.
+
+## 2. Validation set
+
+The following step was to create a validation set. Since the original training set contains a large number of samples (19622) the validation set might be chosen as a subset of the original training set. This was done randomly by using createDataPartition function from the caret package with a p=0.8 (i.e. 80% of the original training set was used for training and 20% was used for validation set). The resulting training set consisted of 15699 samples and the validation set consisted of 3923 samples.
+
+
+```{r}
+library(caret)
+set.seed(2245)
+inBuild<-createDataPartition(y=training.sm$classe,
+                             p=0.8,list=FALSE)
+validation<-training.sm[-inBuild,]
+training<-training.sm[inBuild,]
+dim(training)
+dim(validation)
+
+```
+
+## 3. Model fitting
+
+To find the best predicting model the following methods were used (argument method in the train function from the caret package)
+
+* cart classification trees ("rpart")
+
+* boosted trees ("gbm")
+
+* linear discriminant analisys ("lda")
+
+* random forests ("rf")
+
+Moreover all the four predictions from these models were stacked together using cart.
+
+For all the five approaches the prediction was performed on the validation set, to give an idea what the out of sample error might be expected for each method. 
+
+
+```{r}
+library(caret)
+modFitTr<-train(classe~.,method="rpart",
+                data=training)
+print(modFitTr)
+predTr<-predict(modFitTr,newdata=validation)
+
+T1<-table(predTr,validation$classe)
+AccTr<-sum(diag(T1))/sum(T1)
+AccTr
+
+
+#  boosted trees ("gbm") 
+modFitB<-train(classe~.,method="gbm",data=training,verbose=FALSE)
+print(modFitB)
+predB<-predict(modFitB,newdata=validation)
+T2<-table(predB,validation$classe)
+AccB<-sum(diag(T2))/sum(T2)
+AccB
+
+# linear discriminant analysis ("lda") model.
+modFitLDA<-train(classe~.,method="lda",data=training)
+print(modFitLDA)
+predLDA<-predict(modFitLDA,newdata=validation)
+T3<-table(predLDA,validation$classe)
+AccLDA<-sum(diag(T3))/sum(T3)
+AccLDA
+
+## rf
+modFitRF<-train(classe~.,method="rf",
+                data=training)
+print(modFitRF)
+predRF<-predict(modFitRF,newdata=validation)
+T4<-table(predRF,validation$classe)
+AccRF<-sum(diag(T4))/sum(T4)
+AccRF
+
+#  Stack the predictions together using cart. 
+predDF<-data.frame(predTr,predB,
+                   predLDA,predRF,classe=validation$classe)
+combModFit<-train(classe~., method="rpart",data=predDF)
+combPred<-predict(combModFit,newdata=predDF)
+T5<-table(combPred,validation$classe)
+combAcc<-sum(diag(T5))/sum(T5)
+combAcc
+
+```
+ 
+Accuracies for the five methods were as follows:
+
+* cart classification trees Acc=0.526
+
+* boosted trees Acc=0.993
+
+* linear discriminant analisys Acc=0.449
+
+* random forests Acc=0.997
+
+* Combined prediction Acc=0.660.
+
+Based on these results one may expect that boosted trees and random forests will perform best on the testing set.
+
+## 4. Prediction on a test set
+The final predictionon the test set was made based on the random forest model. For the 20 individuals the following prediction was made based on this method: 
+ [1] B A B A A E D B A A B C B A E E A B B B
+ 
+```{r}
+testing.sm$classe<-rep("NULL",20)
+predTestRF<-predict(modFitRF,newdata=testing.sm)
+predTestRF
+```
+
